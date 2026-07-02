@@ -47,12 +47,13 @@ pipeline {
         }
 
        stage('SonarQube Analysis') {
-             steps {
+            steps {
                 sh '''
-                     if [ ! -d "$HOME/sonar-scanner" ]; then
+                    if [ ! -d "$HOME/sonar-scanner" ]; then
                     curl -sSLo sonar-scanner.zip https://binaries.sonarsource.com/Distribution/sonar-scanner-cli/sonar-scanner-cli-5.0.1.3006-linux.zip
                     python3 -c "import zipfile; zipfile.ZipFile('sonar-scanner.zip').extractall('$HOME')"
                     mv $HOME/sonar-scanner-* $HOME/sonar-scanner
+                    chmod +x $HOME/sonar-scanner/bin/sonar-scanner
                 fi
             export PATH=$HOME/sonar-scanner/bin:$PATH
             sonar-scanner \
