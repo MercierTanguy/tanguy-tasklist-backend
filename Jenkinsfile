@@ -4,7 +4,7 @@ pipeline {
     environment {
         DOCKERHUB_CREDENTIALS = credentials('shown14-dockerhub-password')
         SONAR_TOKEN = credentials('shown14-sonar-token')
-        IMAGE_NAME = "shown14/cicd-tasklist-backend"
+        IMAGE_NAME = "shown14/tanguy-tasklist-backend"
         SONAR_HOST_URL = "https://sonarqube.cicd.kits.ext.educentre.fr"
     }
 
@@ -47,12 +47,11 @@ pipeline {
         }
 
        stage('SonarQube Analysis') {
-            steps {
+             steps {
                 sh '''
-                    if [ ! -d "$HOME/sonar-scanner" ]; then
-                    apt-get install -y unzip 2>/dev/null || true
+                     if [ ! -d "$HOME/sonar-scanner" ]; then
                     curl -sSLo sonar-scanner.zip https://binaries.sonarsource.com/Distribution/sonar-scanner-cli/sonar-scanner-cli-5.0.1.3006-linux.zip
-                    unzip -q sonar-scanner.zip -d $HOME
+                    python3 -c "import zipfile; zipfile.ZipFile('sonar-scanner.zip').extractall('$HOME')"
                     mv $HOME/sonar-scanner-* $HOME/sonar-scanner
                 fi
             export PATH=$HOME/sonar-scanner/bin:$PATH
@@ -61,7 +60,7 @@ pipeline {
               -Dsonar.token=$SONAR_TOKEN \
               -Dsonar.qualitygate.wait=true
             '''
-            }   
+            }
         }
 
         stage('Build Docker image') {
