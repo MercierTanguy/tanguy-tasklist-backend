@@ -46,21 +46,22 @@ pipeline {
             }
         }
 
-        stage('SonarQube Analysis') {
+       stage('SonarQube Analysis') {
             steps {
                 sh '''
                     if [ ! -d "$HOME/sonar-scanner" ]; then
-                        curl -sSLo sonar-scanner.zip https://binaries.sonarsource.com/Distribution/sonar-scanner-cli/sonar-scanner-cli-5.0.1.3006-linux.zip
-                        unzip -q sonar-scanner.zip -d $HOME
-                        mv $HOME/sonar-scanner-* $HOME/sonar-scanner
-                    fi
-                    export PATH=$HOME/sonar-scanner/bin:$PATH
-                    sonar-scanner \
-                      -Dsonar.host.url=$SONAR_HOST_URL \
-                      -Dsonar.token=$SONAR_TOKEN \
-                      -Dsonar.qualitygate.wait=true
-                '''
-            }
+                    apt-get install -y unzip 2>/dev/null || true
+                    curl -sSLo sonar-scanner.zip https://binaries.sonarsource.com/Distribution/sonar-scanner-cli/sonar-scanner-cli-5.0.1.3006-linux.zip
+                    unzip -q sonar-scanner.zip -d $HOME
+                    mv $HOME/sonar-scanner-* $HOME/sonar-scanner
+                fi
+            export PATH=$HOME/sonar-scanner/bin:$PATH
+            sonar-scanner \
+              -Dsonar.host.url=$SONAR_HOST_URL \
+              -Dsonar.token=$SONAR_TOKEN \
+              -Dsonar.qualitygate.wait=true
+            '''
+            }   
         }
 
         stage('Build Docker image') {
