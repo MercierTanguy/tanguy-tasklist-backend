@@ -53,20 +53,22 @@ pipeline {
             }
         }
 
-        stage('SonarQube Analysis') {
-            steps {
-                withSonarQubeEnv('SonarQube') {
-                    script {
-                        def scannerHome = tool 'SonarScanner'
-                        sh "${scannerHome}/bin/sonar-scanner \
-                          -Dsonar.projectKey=tanguy-tasklist-backend \
-                          -Dsonar.projectName='tanguy - TaskList Backend' \
-                          -Dsonar.sources=src \
-                          -Dsonar.exclusions=src/__tests__/** \
-                          -Dsonar.tests=src/__tests__ \
-                          -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info \
-                          -Dsonar.qualitygate.wait=true"
-                    }
+       stage('SonarQube Analysis') {
+             steps {
+                 script {
+                    def scannerHome = tool 'SonarScanner'
+                    sh """
+                    ${scannerHome}/bin/sonar-scanner \
+                  -Dsonar.host.url=https://sonarqube.cicd.kits.ext.educentre.fr \
+                  -Dsonar.token=${SONAR_TOKEN} \
+                  -Dsonar.projectKey=tanguy-tasklist-backend \
+                  -Dsonar.projectName='tanguy - TaskList Backend' \
+                  -Dsonar.sources=src \
+                  -Dsonar.exclusions=src/__tests__/** \
+                  -Dsonar.tests=src/__tests__ \
+                  -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info \
+                  -Dsonar.qualitygate.wait=true
+                """
                 }
             }
         }
