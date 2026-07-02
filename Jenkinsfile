@@ -59,8 +59,8 @@ pipeline {
                     script {
                         def scannerHome = tool 'SonarScanner'
                         sh "${scannerHome}/bin/sonar-scanner \
-                          -Dsonar.projectKey=cicd-tasklist-backend \
-                          -Dsonar.projectName='cicd - TaskList Backend' \
+                          -Dsonar.projectKey=tanguy-tasklist-backend \
+                          -Dsonar.projectName='tanguy - TaskList Backend' \
                           -Dsonar.sources=src \
                           -Dsonar.exclusions=src/__tests__/** \
                           -Dsonar.tests=src/__tests__ \
