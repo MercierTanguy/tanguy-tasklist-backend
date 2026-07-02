@@ -5,7 +5,7 @@ pipeline {
         DOCKERHUB_CREDENTIALS = credentials('shown14-dockerhub-password')
         SONAR_TOKEN = credentials('shown14-sonar-token')
         IMAGE_NAME = "shown14/tanguy-tasklist-backend"
-        SONAR_HOST_URL = "https://sonarqube.cicd.kits.ext.educentre.fr"
+        IMAGE_TAG = "${BUILD_NUMBER}"
     }
 
     stages {
@@ -30,79 +30,80 @@ pipeline {
 
         stage('Unit Tests') {
             steps {
+                sh 'mkdir -p reports'
                 sh 'npm run test:coverage'
+                sh 'cp reports/junit.xml reports/junit-unit.xml'
             }
-        }
-
-        stage('Publish Test Reports') {
-            steps {
-                junit allowEmptyResults: true, testResults: 'reports/junit.xml'
+            post {
+                always {
+                    junit testResults: 'reports/junit-unit.xml', allowEmptyResults: true
+                }
             }
         }
 
         stage('E2E Tests') {
             steps {
                 sh 'npm run test:e2e:coverage'
+                sh 'cp reports/junit.xml reports/junit-e2e.xml'
+            }
+            post {
+                always {
+                    junit testResults: 'reports/junit-e2e.xml', allowEmptyResults: true
+                }
             }
         }
 
-       stage('SonarQube Analysis') {
+        stage('SonarQube Analysis') {
             steps {
-                sh '''
-                    if [ ! -d "$HOME/sonar-scanner" ]; then
-                    curl -sSLo sonar-scanner.zip https://binaries.sonarsource.com/Distribution/sonar-scanner-cli/sonar-scanner-cli-5.0.1.3006-linux.zip
-                    python3 -c "import zipfile; zipfile.ZipFile('sonar-scanner.zip').extractall('$HOME')"
-                    mv $HOME/sonar-scanner-* $HOME/sonar-scanner
-                    chmod +x $HOME/sonar-scanner/bin/sonar-scanner
-                fi
-            export PATH=$HOME/sonar-scanner/bin:$PATH
-            sonar-scanner \
-              -Dsonar.host.url=$SONAR_HOST_URL \
-              -Dsonar.token=$SONAR_TOKEN \
-              -Dsonar.qualitygate.wait=true
-            '''
+                withSonarQubeEnv('SonarQube') {
+                    script {
+                        def scannerHome = tool 'SonarScanner'
+                        sh "${scannerHome}/bin/sonar-scanner \
+                          -Dsonar.projectKey=cicd-tasklist-backend \
+                          -Dsonar.projectName='cicd - TaskList Backend' \
+                          -Dsonar.sources=src \
+                          -Dsonar.exclusions=src/__tests__/** \
+                          -Dsonar.tests=src/__tests__ \
+                          -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info \
+                          -Dsonar.qualitygate.wait=true"
+                    }
+                }
             }
         }
 
         stage('Build Docker image') {
             steps {
-                sh "docker build -t ${IMAGE_NAME}:${BUILD_NUMBER} -t ${IMAGE_NAME}:latest ."
+                sh "docker build -t ${IMAGE_NAME}:${IMAGE_TAG} -t ${IMAGE_NAME}:latest ."
             }
         }
 
         stage('Trivy Security Scan') {
             steps {
-                sh """
-                    mkdir -p trivy-reports
-                    trivy image --severity CRITICAL,HIGH --exit-code 1 \
-                      --format table \
-                      --output trivy-reports/trivy-report.txt \
-                      ${IMAGE_NAME}:${BUILD_NUMBER}
-                """
+                sh 'mkdir -p security-reports'
+                sh "trivy image --format table --output security-reports/trivy-report.txt --severity HIGH,CRITICAL --exit-code 1 ${IMAGE_NAME}:${IMAGE_TAG}"
+            }
+            post {
+                always {
+                    archiveArtifacts artifacts: 'security-reports/*', fingerprint: true
+                }
             }
         }
 
         stage('Generate SBOM') {
             steps {
-                sh """
-                    trivy image --format spdx-json \
-                      --output sbom-spdx.json \
-                      ${IMAGE_NAME}:${BUILD_NUMBER}
-                """
+                sh "trivy image ${IMAGE_NAME}:${IMAGE_TAG} --format spdx-json --output sbom-spdx.json"
             }
-        }
-
-        stage('Archive Reports') {
-            steps {
-                archiveArtifacts artifacts: 'trivy-reports/*.txt', allowEmptyArchive: true
-                archiveArtifacts artifacts: 'sbom-spdx.json', allowEmptyArchive: true
+            post {
+                always {
+                    archiveArtifacts artifacts: 'sbom-spdx.json', fingerprint: true
+                }
             }
         }
 
         stage('Push to DockerHub') {
             steps {
-                sh "echo $DOCKERHUB_CREDENTIALS_PSW | docker login -u $DOCKERHUB_CREDENTIALS_USR --password-stdin"
-                sh "docker push ${IMAGE_NAME}:${BUILD_NUMBER}"
+                sh "echo ${DOCKERHUB_CREDENTIALS_PSW} | docker login -u ${DOCKERHUB_CREDENTIALS_USR} --password-stdin"
+                sh "docker push ${IMAGE_NAME}:${IMAGE_TAG}"
                 sh "docker push ${IMAGE_NAME}:latest"
             }
         }
@@ -110,6 +111,7 @@ pipeline {
 
     post {
         always {
+            sh 'docker logout || true'
             cleanWs()
         }
     }
